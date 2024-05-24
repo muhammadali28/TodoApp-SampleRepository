@@ -49,7 +49,7 @@ jobs:
   steps:
   - script: |
       # Clone the Kubernetes manifest repository
-      git clone https://$(GITHUB_PAT)@github.com/Joelayo/Week_4-Kubernetes-Manifests.git
+      git clone https://$(GITHUB_PAT)@github.com/muhammadali28/TodoApp-SampleRepository.git
       
       # Update the image tag in the Kubernetes manifest files
       buildtag="$(Build.BuildNumber)"
@@ -58,7 +58,7 @@ jobs:
 
       # Commit and push changes using GitHub PAT
       git config user.email "$(GITHUB_EMAIL)"
-      git config user.name "Joelayo"
+      git config user.name "muhammadali28"
       git add .
       git commit -m "Update image tag to $buildtag"
       git push origin main
