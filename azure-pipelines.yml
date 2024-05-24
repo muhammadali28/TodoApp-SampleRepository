@@ -1,0 +1,67 @@
+trigger:
+- main
+
+pool:
+  vmImage: ubuntu-latest
+
+name: v$(Rev:r)
+
+jobs:
+- job: LintAndTest
+  displayName: 'Lint and Test React Code'
+  steps:
+  - script: |
+      # Install dependencies
+      npm install --save-dev eslint@7.x eslint-config-airbnb@18.x eslint-plugin-import@2.x eslint-plugin-jsx-a11y@6.x eslint-plugin-react@7.x eslint-plugin-react-hooks@4.x @babel/eslint-parser@7.x @babel/core@7.x  @babel/plugin-syntax-jsx@7.x @babel/preset-env@7.x  @babel/preset-react@7.x
+      [ -f .eslintrc.json ] || wget https://raw.githubusercontent.com/microverseinc/linters-config/master/react-redux/.eslintrc.json
+      [ -f .babelrc ] || wget https://raw.githubusercontent.com/microverseinc/linters-config/master/react-redux/.babelrc
+      
+      npm install --save-dev stylelint@13.x stylelint-scss@3.x stylelint-config-standard@21.x stylelint-csstree-validator@1.x
+      [ -f .stylelintrc.json ] || wget https://raw.githubusercontent.com/microverseinc/linters-config/master/react-redux/.stylelintrc.json
+      
+      # Run ESLint
+      npx eslint .
+
+      # Run Stylelint
+      npx stylelint "**/*.{css,scss}"
+
+- job: BuildDockerImage
+  displayName: 'Build and Push Docker Image'
+  dependsOn: LintAndTest
+  steps:
+  - script: |
+      buildtag="$(Build.BuildNumber)"
+      echo $buildtag
+      
+      # Log in to Docker Hub
+      echo $(DOCKERHUB_PASSWORD) | docker login -u $(DOCKERHUB_USERNAME) --password-stdin
+      
+      # Build Docker image
+      docker build -t $(DOCKERHUB_USERNAME)/todo-app:$buildtag .
+      
+      # Push Docker image to Docker Hub
+      docker push $(DOCKERHUB_USERNAME)/todo-app:$buildtag
+    displayName: 'Build and Push Docker Image'
+
+- job: UpdateKubeManifest
+  displayName: 'Update Kubernetes Manifest'
+  dependsOn: BuildDockerImage
+  steps:
+  - script: |
+      # Clone the Kubernetes manifest repository
+      git clone https://$(GITHUB_PAT)@github.com/Joelayo/Week_4-Kubernetes-Manifests.git
+      
+      # Update the image tag in the Kubernetes manifest files
+      buildtag="$(Build.BuildNumber)"
+      cd Week_4-Kubernetes-Manifests
+      sed -i "s/todo-app:.*/todo-app:$buildtag/g" kube-manifest/deployment.yaml
+
+      # Commit and push changes using GitHub PAT
+      git config user.email "$(GITHUB_EMAIL)"
+      git config user.name "Joelayo"
+      git add .
+      git commit -m "Update image tag to $buildtag"
+      git push origin main
+    displayName: 'Update Kubernetes Manifest'
+
+
